@@ -1,0 +1,19 @@
+{
+    "Logging": {
+        "LogLevel": {
+            "Default": "Debug",
+            "System": "Information",
+            "Microsoft": "Information"
+        }
+    },
+    "DiscordConfiguration": {
+        "Token": ""
+    },
+    "Notifications": {
+        "WebhookUrl": ""
+    },
+    "TwentyFourSevenConfig": {
+        "Channel": 0,
+        "Track": ""
+    }
+}
