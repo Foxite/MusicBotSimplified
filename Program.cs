@@ -42,7 +42,7 @@ namespace IkIheMusicBotSimplified {
 			
 			discord.Ready += (o, e) => {
 				_ = Task.Run(async () => {
-					await Task.Delay(TimeSpan.FromSeconds(1));
+					await Task.Delay(TimeSpan.FromSeconds(1)); // prevents an error (idk)
 					try {
 						DiscordChannel channel = await discord.GetChannelAsync(config247.Channel) ?? throw new Exception("FUCK");
 						using VoiceNextConnection connection = await channel.ConnectAsync();
@@ -50,15 +50,8 @@ namespace IkIheMusicBotSimplified {
 							_ = host.Services.GetRequiredService<NotificationService>().SendNotificationAsync("VoiceSocketErrored event", e.Exception);
 							return Task.CompletedTask;
 						};
-						
-						using Process ffmpeg = Process.Start(new ProcessStartInfo {
-							FileName = "ffmpeg",
-							Arguments = $@"-stream_loop -1 -i ""{config247.Track}"" -ac 2 -f s16le -ar 48000 pipe:1",
-							RedirectStandardOutput = true,
-							UseShellExecute = false
-						}) ?? throw new Exception("you forgot to install ffmpeg you moron");
 
-						await using Stream pcm = ffmpeg.StandardOutput.BaseStream;
+						await using Stream pcm = File.OpenRead(config247.Track);
 						using VoiceTransmitSink transmit = connection.GetTransmitSink();
 						await pcm.CopyToAsync(transmit);
 					} catch (Exception e) {
@@ -67,7 +60,8 @@ namespace IkIheMusicBotSimplified {
 				});
 				return Task.CompletedTask;
 			};
-			
+
+			discord.UseVoiceNext();
 			await discord.ConnectAsync();
 			
 			await host.RunAsync();
