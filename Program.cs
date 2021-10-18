@@ -53,7 +53,10 @@ namespace IkIheMusicBotSimplified {
 
 						await using Stream pcm = File.OpenRead(config247.Track);
 						using VoiceTransmitSink transmit = connection.GetTransmitSink();
-						await pcm.CopyToAsync(transmit);
+						while (true) {
+							await pcm.CopyToAsync(transmit);
+							pcm.Position = 0;
+						}
 					} catch (Exception e) {
 						Console.WriteLine(e.ToStringDemystified());
 					}
