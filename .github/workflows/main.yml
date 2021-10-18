@@ -1,0 +1,18 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches: [ master ]
+#  pull_request:
+#    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Publish Docker Image to GitHub Registry
+      uses: TilBlechschmidt/gp-docker-action@v0.2-alpha
+      with:
+        github-token: ${{ secrets.PUSH_KEY }}
+        image-name: ik_ihe-music-simplified
