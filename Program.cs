@@ -76,7 +76,7 @@ namespace IkIheMusicBotSimplified {
 					await using Stream pcm = File.OpenRead(track);
 					using VoiceTransmitSink transmit = connection.GetTransmitSink();
 					while (!cts.IsCancellationRequested) {
-						await pcm.CopyToAsync(transmit, cancellationToken: cts.Token);
+						await pcm.CopyToAsync(transmit, 256 * transmit.SampleLength, cts.Token);
 						pcm.Position = 0;
 					}
 				} catch (Exception e) {
