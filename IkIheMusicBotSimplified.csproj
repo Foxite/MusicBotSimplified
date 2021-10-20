@@ -12,7 +12,7 @@
 
     <ItemGroup>
       <PackageReference Include="DSharpPlus.VoiceNext" Version="4.1.0" />
-      <PackageReference Include="Foxite.Common" Version="1.5.5" />
+      <PackageReference Include="Foxite.Common" Version="1.5.6" />
       <PackageReference Include="Microsoft.Extensions.Configuration.NewtonsoftJson" Version="5.0.1" />
       <PackageReference Include="Microsoft.Extensions.Hosting" Version="5.0.0" />
     </ItemGroup>
