@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using DSharpPlus;
 using DSharpPlus.Entities;
@@ -13,7 +14,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace IkIheMusicBotSimplified {
-	public static class Program {
+	public sealed class Program {
 		private static async Task Main(string[] args) {
 			IHost host = Host.CreateDefaultBuilder()
 				.UseConsoleLifetime()
@@ -40,28 +41,13 @@ namespace IkIheMusicBotSimplified {
 			var discord = host.Services.GetRequiredService<DiscordClient>();
 			TwentyFourSevenConfig config247 = host.Services.GetRequiredService<IOptions<TwentyFourSevenConfig>>().Value;
 			
-			discord.Ready += (o, e) => {
-				_ = Task.Run(async () => {
-					await Task.Delay(TimeSpan.FromSeconds(1)); // prevents an error (idk)
-					try {
-						DiscordChannel channel = await discord.GetChannelAsync(config247.Channel) ?? throw new Exception("FUCK");
-						using VoiceNextConnection connection = await channel.ConnectAsync();
-						connection.VoiceSocketErrored += (o, e) => {
-							_ = host.Services.GetRequiredService<NotificationService>().SendNotificationAsync("VoiceSocketErrored event", e.Exception);
-							return Task.CompletedTask;
-						};
-
-						await using Stream pcm = File.OpenRead(config247.Track);
-						using VoiceTransmitSink transmit = connection.GetTransmitSink();
-						while (true) {
-							await pcm.CopyToAsync(transmit);
-							pcm.Position = 0;
-						}
-					} catch (Exception e) {
-						Console.WriteLine(e.ToStringDemystified());
-					}
-				});
-				return Task.CompletedTask;
+			discord.Ready += async (o, e) => {
+				StartPlaying(
+					host.Services.GetRequiredService<ILogger<Program>>(),
+					host.Services.GetRequiredService<NotificationService>(),
+					await discord.GetChannelAsync(config247.Channel) ?? throw new Exception("FUCK"),
+					config247.Track
+				);
 			};
 
 			discord.UseVoiceNext();
@@ -71,6 +57,36 @@ namespace IkIheMusicBotSimplified {
 
 			await discord.DisconnectAsync();
 			//discord.Dispose();
+		}
+
+		private static void StartPlaying(ILogger logger, NotificationService notifications, DiscordChannel channel, string track) {
+			_ = Task.Run(async () => {
+				await Task.Delay(TimeSpan.FromSeconds(1)); // prevents an error (idk)
+				bool reportError = true;
+				try {
+					var cts = new CancellationTokenSource();
+					using VoiceNextConnection connection = await channel.ConnectAsync();
+					connection.VoiceSocketErrored += async (o, e) => {
+						reportError = false;
+						cts.Cancel();
+						logger.LogCritical(e.Exception.Demystify(), "VoiceSocketErrored event, attempting to reconnect");
+						await notifications.SendNotificationAsync("VoiceSocketErrored event, attempting to reconnect", e.Exception.Demystify());
+					};
+
+					await using Stream pcm = File.OpenRead(track);
+					using VoiceTransmitSink transmit = connection.GetTransmitSink();
+					while (!cts.IsCancellationRequested) {
+						await pcm.CopyToAsync(transmit, cancellationToken: cts.Token);
+						pcm.Position = 0;
+					}
+				} catch (Exception e) {
+					if (reportError) {
+						logger.LogCritical(e.Demystify(), "Error during playback, attempting to reconnect");
+						await notifications.SendNotificationAsync("VoiceSocketErrored event", e.Demystify());
+					}
+					StartPlaying(logger, notifications, channel, track);
+				}
+			});
 		}
 	}
 }
