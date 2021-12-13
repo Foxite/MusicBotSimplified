@@ -68,9 +68,9 @@ namespace IkIheMusicBotSimplified {
 					using VoiceNextConnection connection = await channel.ConnectAsync();
 					connection.VoiceSocketErrored += async (o, e) => {
 						reportError = false;
-						cts.Cancel();
-						logger.LogCritical(e.Exception.Demystify(), "VoiceSocketErrored event, attempting to reconnect");
-						await notifications.SendNotificationAsync("VoiceSocketErrored event, attempting to reconnect", e.Exception.Demystify());
+						//cts.Cancel();
+						logger.LogError(e.Exception.Demystify(), "VoiceSocketErrored event");
+						await notifications.SendNotificationAsync("VoiceSocketErrored event", e.Exception.Demystify());
 					};
 
 					await using Stream pcm = File.OpenRead(track);
