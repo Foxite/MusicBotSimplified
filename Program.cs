@@ -15,8 +15,10 @@ using Microsoft.Extensions.Options;
 
 namespace IkIheMusicBotSimplified {
 	public sealed class Program {
+		private static IHost ProgramHost { get; set; }
+		
 		private static async Task Main(string[] args) {
-			IHost host = Host.CreateDefaultBuilder()
+			ProgramHost = Host.CreateDefaultBuilder()
 				.UseConsoleLifetime()
 				.ConfigureAppConfiguration(configBuilder => {
 					configBuilder.SetBasePath(Directory.GetCurrentDirectory());
@@ -38,15 +40,15 @@ namespace IkIheMusicBotSimplified {
 				})
 				.Build();
 
-			var discord = host.Services.GetRequiredService<DiscordClient>();
+			var discord = ProgramHost.Services.GetRequiredService<DiscordClient>();
 			
-			TwentyFourSevenConfig config247 = host.Services.GetRequiredService<IOptions<TwentyFourSevenConfig>>().Value;
+			TwentyFourSevenConfig config247 = ProgramHost.Services.GetRequiredService<IOptions<TwentyFourSevenConfig>>().Value;
 			
 			discord.Ready += async (o, e) => {
-				var notificationService = host.Services.GetRequiredService<NotificationService>();
+				var notificationService = ProgramHost.Services.GetRequiredService<NotificationService>();
 				await notificationService.SendNotificationAsync("Ready event."); // temporary, this is to see if the ready event fires more than once in the client lifetime
 				StartPlaying(
-					host.Services.GetRequiredService<ILogger<Program>>(),
+					ProgramHost.Services.GetRequiredService<ILogger<Program>>(),
 					notificationService,
 					await discord.GetChannelAsync(config247.Channel) ?? throw new Exception("FUCK"),
 					config247.Track,
@@ -57,7 +59,7 @@ namespace IkIheMusicBotSimplified {
 			discord.UseVoiceNext();
 			await discord.ConnectAsync();
 			
-			await host.RunAsync();
+			await ProgramHost.RunAsync();
 
 			await discord.DisconnectAsync();
 			//discord.Dispose();
@@ -90,6 +92,7 @@ namespace IkIheMusicBotSimplified {
 							if (consecutiveErrors > 5) {
 								logger.LogCritical("Too many errors, restarting");
 								await notifications.SendNotificationAsync("Too many errors, restarting");
+								await ProgramHost.StopAsync();
 								return;
 							}
 						}
