@@ -95,6 +95,8 @@ namespace IkIheMusicBotSimplified {
 								await ProgramHost.StopAsync();
 								return;
 							}
+						} else {
+							consecutiveErrors = 0;
 						}
 						lastError = DateTime.Now;
 					}
