@@ -39,14 +39,18 @@ namespace IkIheMusicBotSimplified {
 				.Build();
 
 			var discord = host.Services.GetRequiredService<DiscordClient>();
+			
 			TwentyFourSevenConfig config247 = host.Services.GetRequiredService<IOptions<TwentyFourSevenConfig>>().Value;
 			
 			discord.Ready += async (o, e) => {
+				var notificationService = host.Services.GetRequiredService<NotificationService>();
+				await notificationService.SendNotificationAsync("Ready event."); // temporary, this is to see if the ready event fires more than once in the client lifetime
 				StartPlaying(
 					host.Services.GetRequiredService<ILogger<Program>>(),
-					host.Services.GetRequiredService<NotificationService>(),
+					notificationService,
 					await discord.GetChannelAsync(config247.Channel) ?? throw new Exception("FUCK"),
-					config247.Track
+					config247.Track,
+					discord.GetVoiceNext()
 				);
 			};
 
@@ -59,32 +63,38 @@ namespace IkIheMusicBotSimplified {
 			//discord.Dispose();
 		}
 
-		private static void StartPlaying(ILogger logger, NotificationService notifications, DiscordChannel channel, string track) {
+		private static void StartPlaying(ILogger logger, NotificationService notifications, DiscordChannel channel, string track, VoiceNextExtension voiceNextExtension) {
 			_ = Task.Run(async () => {
-				await Task.Delay(TimeSpan.FromSeconds(1)); // prevents an error (idk)
-				bool reportError = true;
-				try {
-					var cts = new CancellationTokenSource();
-					using VoiceNextConnection connection = await channel.ConnectAsync();
-					connection.VoiceSocketErrored += async (o, e) => {
-						reportError = false;
-						//cts.Cancel();
-						logger.LogError(e.Exception.Demystify(), "VoiceSocketErrored event");
-						await notifications.SendNotificationAsync("VoiceSocketErrored event", e.Exception.Demystify());
-					};
+				var lastError = DateTime.MinValue;
+				int consecutiveErrors = 0;
+				while (true) {
+					await Task.Delay(TimeSpan.FromSeconds(1)); // prevents an error (idk)
+					try {
+						using VoiceNextConnection connection = voiceNextExtension.GetConnection(channel.Guild) ?? await channel.ConnectAsync();
+						connection.VoiceSocketErrored += async (o, e) => {
+							logger.LogError(e.Exception.Demystify(), "VoiceSocketErrored event");
+							await notifications.SendNotificationAsync("VoiceSocketErrored event", e.Exception.Demystify());
+						};
 
-					await using Stream pcm = File.OpenRead(track);
-					using VoiceTransmitSink transmit = connection.GetTransmitSink();
-					while (!cts.IsCancellationRequested) {
-						await pcm.CopyToAsync(transmit, 256 * transmit.SampleLength, cts.Token);
-						pcm.Position = 0;
+						await using Stream pcm = File.OpenRead(track);
+						using VoiceTransmitSink transmit = connection.GetTransmitSink();
+						while (true) {
+							await pcm.CopyToAsync(transmit, 256 * transmit.SampleLength);
+							pcm.Position = 0;
+						}
+					} catch (Exception e) {
+						logger.LogCritical(e.Demystify(), "Error during playback");
+						await notifications.SendNotificationAsync("Error during playback", e.Demystify());
+						if ((DateTime.Now - lastError).TotalMinutes < 1) {
+							consecutiveErrors++;
+							if (consecutiveErrors > 5) {
+								logger.LogCritical("Too many errors, restarting");
+								await notifications.SendNotificationAsync("Too many errors, restarting");
+								return;
+							}
+						}
+						lastError = DateTime.Now;
 					}
-				} catch (Exception e) {
-					if (reportError) {
-						logger.LogCritical(e.Demystify(), "Error during playback, attempting to reconnect");
-						await notifications.SendNotificationAsync("VoiceSocketErrored event", e.Demystify());
-					}
-					StartPlaying(logger, notifications, channel, track);
 				}
 			});
 		}
