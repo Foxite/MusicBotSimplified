@@ -29,7 +29,7 @@ namespace IkIheMusicBotSimplified {
 				.ConfigureServices((ctx, isc) => {
 					isc.Configure<DiscordConfiguration>(ctx.Configuration.GetSection(nameof(DiscordConfiguration)));
 					isc.Configure<TwentyFourSevenConfig>(ctx.Configuration.GetSection(nameof(TwentyFourSevenConfig)));
-					
+
 					isc.AddNotifications()
 						.AddDiscord(ctx.Configuration.GetSection("Notifications"));
 
@@ -41,12 +41,18 @@ namespace IkIheMusicBotSimplified {
 				.Build();
 
 			var discord = ProgramHost.Services.GetRequiredService<DiscordClient>();
-			
+			discord.SocketClosed += (_, ea) => {
+				if (ea.CloseCode > 4000 && ea.CloseCode < 4999) {
+					return ProgramHost.Services.GetRequiredService<NotificationService>().SendNotificationAsync($"Socket closed: {ea.CloseCode} {ea.CloseMessage}"); // temporary, this is to try to see if code 4006 causes the problem
+				} else {
+					return Task.CompletedTask;
+				}
+			};
+
 			TwentyFourSevenConfig config247 = ProgramHost.Services.GetRequiredService<IOptions<TwentyFourSevenConfig>>().Value;
 			
 			discord.Ready += async (o, e) => {
 				var notificationService = ProgramHost.Services.GetRequiredService<NotificationService>();
-				await notificationService.SendNotificationAsync("Ready event."); // temporary, this is to see if the ready event fires more than once in the client lifetime
 				StartPlaying(
 					ProgramHost.Services.GetRequiredService<ILogger<Program>>(),
 					notificationService,
@@ -77,7 +83,7 @@ namespace IkIheMusicBotSimplified {
 							logger.LogError(e.Exception.Demystify(), "VoiceSocketErrored event");
 							await notifications.SendNotificationAsync("VoiceSocketErrored event", e.Exception.Demystify());
 						};
-
+						
 						await using Stream pcm = File.OpenRead(track);
 						using VoiceTransmitSink transmit = connection.GetTransmitSink();
 						while (true) {
