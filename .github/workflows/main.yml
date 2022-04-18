@@ -3,8 +3,7 @@ name: Docker Image CI
 on:
   push:
     branches: [ master ]
-#  pull_request:
-#    branches: [ master ]
+  pull_request:
 
 jobs:
   build:
@@ -19,3 +18,4 @@ jobs:
         username: ${{ secrets.PUSH_USER }}
         password: ${{ secrets.PUSH_PASSWD }}
         default_branch: master
+        no_push: ${{ github.event_name == 'pull_request' }}
