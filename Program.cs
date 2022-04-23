@@ -1,17 +1,13 @@
 ﻿using System;
-using System.Diagnostics;
 using System.IO;
-using System.Threading;
 using System.Threading.Tasks;
 using DSharpPlus;
 using DSharpPlus.Entities;
 using DSharpPlus.VoiceNext;
-using Foxite.Common.Notifications;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace IkIheMusicBotSimplified {
 	public sealed class Program {
@@ -27,11 +23,8 @@ namespace IkIheMusicBotSimplified {
 					configBuilder.AddCommandLine(args);
 				})
 				.ConfigureServices((ctx, isc) => {
-					isc.Configure<DiscordConfiguration>(ctx.Configuration.GetSection(nameof(DiscordConfiguration)));
-					isc.Configure<TwentyFourSevenConfig>(ctx.Configuration.GetSection(nameof(TwentyFourSevenConfig)));
-
-					isc.AddSingleton(isp => new DiscordClient(new DSharpPlus.DiscordConfiguration() {
-						Token = isp.GetRequiredService<IOptions<DiscordConfiguration>>().Value.Token,
+					isc.AddSingleton(isp => new DiscordClient(new DiscordConfiguration() {
+						Token = Environment.GetEnvironmentVariable("BOT_TOKEN"),
 						LoggerFactory = isp.GetRequiredService<ILoggerFactory>()
 					}));
 				})
@@ -39,13 +32,11 @@ namespace IkIheMusicBotSimplified {
 
 			var discord = ProgramHost.Services.GetRequiredService<DiscordClient>();
 
-			TwentyFourSevenConfig config247 = ProgramHost.Services.GetRequiredService<IOptions<TwentyFourSevenConfig>>().Value;
+			ulong channelId = ulong.Parse(Environment.GetEnvironmentVariable("CHANNEL_ID"));
+			string track = Environment.GetEnvironmentVariable("TRACK");
 			
 			discord.Ready += async (o, e) => {
-				StartPlaying(await discord.GetChannelAsync(config247.Channel) ?? throw new Exception("FUCK"),
-					config247.Track,
-					discord.GetVoiceNext()
-				);
+				StartPlaying(await discord.GetChannelAsync(channelId), track, discord.GetVoiceNext());
 			};
 
 			discord.UseVoiceNext();
