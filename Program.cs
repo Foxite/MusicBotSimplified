@@ -4,33 +4,13 @@ using System.Threading.Tasks;
 using DSharpPlus;
 using DSharpPlus.Entities;
 using DSharpPlus.VoiceNext;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 
 namespace IkIheMusicBotSimplified {
 	public sealed class Program {
-		private static IHost ProgramHost { get; set; }
-		
 		private static async Task Main(string[] args) {
-			ProgramHost = Host.CreateDefaultBuilder()
-				.UseConsoleLifetime()
-				.ConfigureAppConfiguration(configBuilder => {
-					configBuilder.SetBasePath(Directory.GetCurrentDirectory());
-					configBuilder.AddNewtonsoftJsonFile("appsettings.json");
-					configBuilder.AddEnvironmentVariables("IKIHE_");
-					configBuilder.AddCommandLine(args);
-				})
-				.ConfigureServices((ctx, isc) => {
-					isc.AddSingleton(isp => new DiscordClient(new DiscordConfiguration() {
-						Token = Environment.GetEnvironmentVariable("BOT_TOKEN"),
-						LoggerFactory = isp.GetRequiredService<ILoggerFactory>()
-					}));
-				})
-				.Build();
-
-			var discord = ProgramHost.Services.GetRequiredService<DiscordClient>();
+			var discord = new DiscordClient(new DiscordConfiguration() {
+				Token = Environment.GetEnvironmentVariable("BOT_TOKEN")
+			});
 
 			ulong channelId = ulong.Parse(Environment.GetEnvironmentVariable("CHANNEL_ID"));
 			string track = Environment.GetEnvironmentVariable("TRACK");
@@ -41,11 +21,8 @@ namespace IkIheMusicBotSimplified {
 
 			discord.UseVoiceNext();
 			await discord.ConnectAsync();
-			
-			await ProgramHost.RunAsync();
 
-			await discord.DisconnectAsync();
-			//discord.Dispose();
+			await Task.Delay(-1);
 		}
 
 		private static void StartPlaying(DiscordChannel channel, string track, VoiceNextExtension voiceNextExtension) {
