@@ -31,6 +31,11 @@ discord.Ready += () => {
 	return Task.CompletedTask;
 };
 
+discord.Log += lm => {
+	Console.WriteLine(lm.ToString(timestampKind: DateTimeKind.Utc));
+	return Task.CompletedTask;
+};
+
 await discord.LoginAsync(TokenType.Bot, Environment.GetEnvironmentVariable("BOT_TOKEN"));
 await discord.StartAsync();
 
