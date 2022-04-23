@@ -30,9 +30,6 @@ namespace IkIheMusicBotSimplified {
 					isc.Configure<DiscordConfiguration>(ctx.Configuration.GetSection(nameof(DiscordConfiguration)));
 					isc.Configure<TwentyFourSevenConfig>(ctx.Configuration.GetSection(nameof(TwentyFourSevenConfig)));
 
-					isc.AddNotifications()
-						.AddDiscord(ctx.Configuration.GetSection("Notifications"));
-
 					isc.AddSingleton(isp => new DiscordClient(new DSharpPlus.DiscordConfiguration() {
 						Token = isp.GetRequiredService<IOptions<DiscordConfiguration>>().Value.Token,
 						LoggerFactory = isp.GetRequiredService<ILoggerFactory>()
@@ -41,22 +38,11 @@ namespace IkIheMusicBotSimplified {
 				.Build();
 
 			var discord = ProgramHost.Services.GetRequiredService<DiscordClient>();
-			discord.SocketClosed += (_, ea) => {
-				if (ea.CloseCode > 4000 && ea.CloseCode < 4999) {
-					return ProgramHost.Services.GetRequiredService<NotificationService>().SendNotificationAsync($"Socket closed: {ea.CloseCode} {ea.CloseMessage}"); // temporary, this is to try to see if code 4006 causes the problem
-				} else {
-					return Task.CompletedTask;
-				}
-			};
 
 			TwentyFourSevenConfig config247 = ProgramHost.Services.GetRequiredService<IOptions<TwentyFourSevenConfig>>().Value;
 			
 			discord.Ready += async (o, e) => {
-				var notificationService = ProgramHost.Services.GetRequiredService<NotificationService>();
-				StartPlaying(
-					ProgramHost.Services.GetRequiredService<ILogger<Program>>(),
-					notificationService,
-					await discord.GetChannelAsync(config247.Channel) ?? throw new Exception("FUCK"),
+				StartPlaying(await discord.GetChannelAsync(config247.Channel) ?? throw new Exception("FUCK"),
 					config247.Track,
 					discord.GetVoiceNext()
 				);
@@ -71,40 +57,16 @@ namespace IkIheMusicBotSimplified {
 			//discord.Dispose();
 		}
 
-		private static void StartPlaying(ILogger logger, NotificationService notifications, DiscordChannel channel, string track, VoiceNextExtension voiceNextExtension) {
+		private static void StartPlaying(DiscordChannel channel, string track, VoiceNextExtension voiceNextExtension) {
 			_ = Task.Run(async () => {
-				var lastError = DateTime.MinValue;
-				int consecutiveErrors = 0;
 				while (true) {
 					await Task.Delay(TimeSpan.FromSeconds(1)); // prevents an error (idk)
-					try {
-						using VoiceNextConnection connection = voiceNextExtension.GetConnection(channel.Guild) ?? await channel.ConnectAsync();
-						connection.VoiceSocketErrored += async (o, e) => {
-							logger.LogError(e.Exception.Demystify(), "VoiceSocketErrored event");
-							await notifications.SendNotificationAsync("VoiceSocketErrored event", e.Exception.Demystify());
-						};
-						
-						await using Stream pcm = File.OpenRead(track);
-						using VoiceTransmitSink transmit = connection.GetTransmitSink();
-						while (true) {
-							await pcm.CopyToAsync(transmit, 256 * transmit.SampleLength);
-							pcm.Position = 0;
-						}
-					} catch (Exception e) {
-						logger.LogCritical(e.Demystify(), "Error during playback");
-						await notifications.SendNotificationAsync("Error during playback", e.Demystify());
-						if ((DateTime.Now - lastError).TotalMinutes < 1) {
-							consecutiveErrors++;
-							if (consecutiveErrors > 5) {
-								logger.LogCritical("Too many errors, restarting");
-								await notifications.SendNotificationAsync("Too many errors, restarting");
-								await ProgramHost.StopAsync();
-								return;
-							}
-						} else {
-							consecutiveErrors = 0;
-						}
-						lastError = DateTime.Now;
+					using VoiceNextConnection connection = voiceNextExtension.GetConnection(channel.Guild) ?? await channel.ConnectAsync();
+					await using Stream pcm = File.OpenRead(track);
+					using VoiceTransmitSink transmit = connection.GetTransmitSink();
+					while (true) {
+						await pcm.CopyToAsync(transmit, 256 * transmit.SampleLength);
+						pcm.Position = 0;
 					}
 				}
 			});
