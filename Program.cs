@@ -18,8 +18,6 @@ discord.Ready += () => {
 
 			using IAudioClient audio = await channel.ConnectAsync(selfDeaf: true);
 			await using AudioOutStream transmit = audio.CreatePCMStream(AudioApplication.Music);
-			//using VoiceNextConnection connection = voiceNextExtension.GetConnection(channel.Guild) ?? await channel.ConnectAsync();
-			//using VoiceTransmitSink transmit = connection.GetTransmitSink();
 
 			await using FileStream pcm = File.OpenRead(track);
 			while (true) {
