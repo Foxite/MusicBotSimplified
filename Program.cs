@@ -5,7 +5,9 @@ using Discord;
 using Discord.Audio;
 using Discord.WebSocket;
 
-var discord = new DiscordSocketClient();
+var discord = new DiscordSocketClient(new DiscordSocketConfig() {
+	GatewayIntents = GatewayIntents.Guilds | GatewayIntents.GuildVoiceStates
+});
 
 ulong channelId = ulong.Parse(Environment.GetEnvironmentVariable("CHANNEL_ID"));
 string track = Environment.GetEnvironmentVariable("TRACK");
@@ -13,7 +15,6 @@ string track = Environment.GetEnvironmentVariable("TRACK");
 discord.Ready += () => {
 	_ = Task.Run(async () => {
 		try {
-			await Task.Delay(TimeSpan.FromSeconds(1)); // prevents an NRE inside ConnectAsync (yeah)
 			var channel = (IVoiceChannel) await discord.GetChannelAsync(channelId);
 
 			using IAudioClient audio = await channel.ConnectAsync(selfDeaf: true);
