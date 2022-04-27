@@ -9,8 +9,8 @@ var discord = new DiscordSocketClient(new DiscordSocketConfig() {
 	GatewayIntents = GatewayIntents.Guilds | GatewayIntents.GuildVoiceStates
 });
 
-ulong channelId = ulong.Parse(Environment.GetEnvironmentVariable("CHANNEL_ID"));
-string track = Environment.GetEnvironmentVariable("TRACK");
+ulong channelId = ulong.Parse(Environment.GetEnvironmentVariable("CHANNEL_ID")!);
+string track = Environment.GetEnvironmentVariable("TRACK")!;
 
 discord.Ready += () => {
 	_ = Task.Run(async () => {
@@ -20,10 +20,10 @@ discord.Ready += () => {
 			using IAudioClient audio = await channel.ConnectAsync(selfDeaf: true);
 			await using AudioOutStream transmit = audio.CreatePCMStream(AudioApplication.Music);
 
-			await using FileStream pcm = File.OpenRead(track);
 			while (true) {
-				pcm.Seek(0, SeekOrigin.Begin);
+				await using FileStream pcm = File.OpenRead(track);
 				await pcm.CopyToAsync(transmit);
+				Console.WriteLine("Loop end");
 			}
 		} catch (Exception ex) {
 			Console.WriteLine(ex);
