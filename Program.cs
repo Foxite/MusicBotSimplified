@@ -18,21 +18,65 @@ var stopProgram = new CancellationTokenSource();
 
 discord.Ready += () => {
 	_ = Task.Run(async () => {
-		try {
-			var channel = (IVoiceChannel) await discord.GetChannelAsync(channelId);
+		var channel = (IVoiceChannel) await discord.GetChannelAsync(channelId);
 
-			using IAudioClient audio = await channel.ConnectAsync(selfDeaf: true);
-			await using AudioOutStream transmit = audio.CreatePCMStream(AudioApplication.Music);
+		// no using, this function returns shortly.
+		IAudioClient audio = await channel.ConnectAsync(selfDeaf: true);
 
-			while (true) {
-				await using FileStream pcm = File.OpenRead(track);
-				await pcm.CopyToAsync(transmit);
-				Console.WriteLine("Loop end");
+		int users = 0;
+
+		bool keepTransmitting = true;
+		long position = 0;
+
+		void StopTransmitting() {
+			keepTransmitting = false;
+		}
+
+		byte[] buffer = new byte[4096];
+		void StartTransmitting() {
+			keepTransmitting = true;
+			_ = Task.Run(async () => {
+				try {
+					await using FileStream file = File.OpenRead(track);
+					await using AudioOutStream transmit = audio.CreatePCMStream(AudioApplication.Music);
+					while (keepTransmitting) {
+						file.Seek(position, SeekOrigin.Begin);
+						int count;
+						while (keepTransmitting && (count = file.Read(buffer, 0, buffer.Length)) > 0) {
+							transmit.Write(buffer, 0, count);
+						}
+						if (keepTransmitting) {
+							position = 0;
+						} else {
+							break;
+						}
+					}
+					position = file.Position;
+				} catch (Exception ex) {
+					Console.WriteLine(ex);
+					stopProgram.Cancel();
+				}
+			});
+		}
+
+		discord.UserVoiceStateUpdated += (user, before, after) => {
+			if (after.VoiceChannel != null && after.VoiceChannel.Id == channelId) {
+				if (users == 0) {
+					StartTransmitting();
+				}
+				users++;
+			} else if (before.VoiceChannel != null && before.VoiceChannel.Id == channelId) {
+				users--;
+				if (users == 0) {
+					StopTransmitting();
+				}
 			}
-		} catch (Exception ex) {
-			Console.WriteLine(ex);
-		} finally {
-			stopProgram.Cancel();
+			return Task.CompletedTask;
+		};
+		
+		users = audio.GetStreams().Count;
+		if (users > 0) {
+			StartTransmitting();
 		}
 	});
 	return Task.CompletedTask;
