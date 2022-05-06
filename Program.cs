@@ -1,16 +1,20 @@
 ﻿using System;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using Discord;
 using Discord.Audio;
 using Discord.WebSocket;
 
+string botToken = Environment.GetEnvironmentVariable("BOT_TOKEN")!;
+ulong channelId = ulong.Parse(Environment.GetEnvironmentVariable("CHANNEL_ID")!);
+string track = Environment.GetEnvironmentVariable("TRACK")!;
+
 var discord = new DiscordSocketClient(new DiscordSocketConfig() {
 	GatewayIntents = GatewayIntents.Guilds | GatewayIntents.GuildVoiceStates
 });
 
-ulong channelId = ulong.Parse(Environment.GetEnvironmentVariable("CHANNEL_ID")!);
-string track = Environment.GetEnvironmentVariable("TRACK")!;
+var stopProgram = new CancellationTokenSource();
 
 discord.Ready += () => {
 	_ = Task.Run(async () => {
@@ -27,6 +31,8 @@ discord.Ready += () => {
 			}
 		} catch (Exception ex) {
 			Console.WriteLine(ex);
+		} finally {
+			stopProgram.Cancel();
 		}
 	});
 	return Task.CompletedTask;
@@ -37,7 +43,7 @@ discord.Log += lm => {
 	return Task.CompletedTask;
 };
 
-await discord.LoginAsync(TokenType.Bot, Environment.GetEnvironmentVariable("BOT_TOKEN"));
+await discord.LoginAsync(TokenType.Bot, botToken);
 await discord.StartAsync();
 
-await Task.Delay(-1);
+await Task.Delay(-1, stopProgram.Token);
