@@ -2,26 +2,27 @@
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using Discord;
-using Discord.Audio;
-using Discord.WebSocket;
+using DSharpPlus;
+using DSharpPlus.Entities;
+using DSharpPlus.VoiceNext;
 
 string botToken = Environment.GetEnvironmentVariable("BOT_TOKEN")!;
 ulong channelId = ulong.Parse(Environment.GetEnvironmentVariable("CHANNEL_ID")!);
 string track = Environment.GetEnvironmentVariable("TRACK")!;
 
-var discord = new DiscordSocketClient(new DiscordSocketConfig() {
-	GatewayIntents = GatewayIntents.Guilds | GatewayIntents.GuildVoiceStates
+var discord = new DiscordClient(new DiscordConfiguration() {
+	Intents = DiscordIntents.Guilds | DiscordIntents.GuildVoiceStates,
+	Token = botToken
 });
 
 var stopProgram = new CancellationTokenSource();
 
 discord.Ready += () => {
 	_ = Task.Run(async () => {
-		var channel = (IVoiceChannel) await discord.GetChannelAsync(channelId);
+		DiscordChannel channel = await discord.GetChannelAsync(channelId);
 
 		// no using, this function returns shortly.
-		IAudioClient audio = await channel.ConnectAsync(selfDeaf: true);
+		VoiceNextConnection audio = await channel.ConnectAsync();
 
 		int users = 0;
 
@@ -38,12 +39,12 @@ discord.Ready += () => {
 			_ = Task.Run(async () => {
 				try {
 					await using FileStream file = File.OpenRead(track);
-					await using AudioOutStream transmit = audio.CreatePCMStream(AudioApplication.Music);
+					VoiceTransmitSink transmit = audio.GetTransmitSink();
 					while (keepTransmitting) {
 						file.Seek(position, SeekOrigin.Begin);
 						int count;
 						while (keepTransmitting && (count = file.Read(buffer, 0, buffer.Length)) > 0) {
-							transmit.Write(buffer, 0, count);
+							await transmit.WriteAsync(buffer, 0, count);
 						}
 						if (keepTransmitting) {
 							position = 0;
@@ -59,13 +60,13 @@ discord.Ready += () => {
 			});
 		}
 
-		discord.UserVoiceStateUpdated += (user, before, after) => {
-			if (after.VoiceChannel != null && after.VoiceChannel.Id == channelId) {
+		discord.VoiceStateUpdated += (_, eventArgs) => {
+			if (eventArgs.After.Channel != null && eventArgs.After.Channel.Id == channelId) {
 				if (users == 0) {
 					StartTransmitting();
 				}
 				users++;
-			} else if (before.VoiceChannel != null && before.VoiceChannel.Id == channelId) {
+			} else if (eventArgs.Before.Channel != null && eventArgs.Before.Channel.Id == channelId) {
 				users--;
 				if (users == 0) {
 					StopTransmitting();
@@ -82,12 +83,6 @@ discord.Ready += () => {
 	return Task.CompletedTask;
 };
 
-discord.Log += lm => {
-	Console.WriteLine(lm.ToString(timestampKind: DateTimeKind.Utc));
-	return Task.CompletedTask;
-};
-
-await discord.LoginAsync(TokenType.Bot, botToken);
-await discord.StartAsync();
+await discord.ConnectAsync();
 
 await Task.Delay(-1, stopProgram.Token);
