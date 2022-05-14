@@ -66,12 +66,12 @@ discord.Ready += (_, _) => {
 			}
 
 			discord.VoiceStateUpdated += (_, e) => {
-				if (e.After.Channel != null && e.After.Channel.Id == channelId) {
+				if ((e.Before.Channel == null || e.Before.Channel.Id != channelId) && e.After.Channel != null && e.After.Channel.Id == channelId) {
 					users++;
 					if (users > 1) {
 						StartTransmitting();
 					}
-				} else if (e.Before.Channel != null && e.Before.Channel.Id == channelId) {
+				} else if (e.Before.Channel != null && e.Before.Channel.Id == channelId && (e.After.Channel == null || e.After.Channel.Id != channelId)) {
 					users--;
 					if (users <= 1) {
 						StopTransmitting();
