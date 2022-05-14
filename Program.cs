@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using DSharpPlus;
@@ -67,20 +68,21 @@ discord.Ready += (_, _) => {
 
 			discord.VoiceStateUpdated += (_, e) => {
 				if ((e.Before.Channel == null || e.Before.Channel.Id != channelId) && e.After.Channel != null && e.After.Channel.Id == channelId) {
-					users++;
-					if (users > 1) {
+					if (users++ == 0 && users >= 1) {
 						StartTransmitting();
 					}
+					//Console.WriteLine(users);
 				} else if (e.Before.Channel != null && e.Before.Channel.Id == channelId && (e.After.Channel == null || e.After.Channel.Id != channelId)) {
-					users--;
-					if (users <= 1) {
+					if (users-- >= 1 && users == 0) {
 						StopTransmitting();
 					}
+					//Console.WriteLine(users);
 				}
 				return Task.CompletedTask;
 			};
 
-			users = audio.TargetChannel.Users.Count;
+			users = audio.TargetChannel.Users.Count(member => !member.IsCurrent);
+			//Console.WriteLine(users);
 			if (users > 1) {
 				StartTransmitting();
 			}
