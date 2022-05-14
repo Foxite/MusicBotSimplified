@@ -71,19 +71,19 @@ discord.Ready += (_, _) => {
 					if (users++ == 0 && users >= 1) {
 						StartTransmitting();
 					}
-					//Console.WriteLine(users);
+					Console.WriteLine(users);
 				} else if (e.Before != null && e.Before.Channel != null && e.Before.Channel.Id == channelId && (e.After == null || e.After.Channel == null || e.After.Channel.Id != channelId)) {
 					if (users-- >= 1 && users == 0) {
 						StopTransmitting();
 					}
-					//Console.WriteLine(users);
+					Console.WriteLine(users);
 				}
 				return Task.CompletedTask;
 			};
 
 			users = audio.TargetChannel.Users.Count(member => !member.IsCurrent);
-			//Console.WriteLine(users);
-			if (users > 1) {
+			Console.WriteLine(users);
+			if (users >= 1) {
 				StartTransmitting();
 			}
 		} catch (Exception ex) {
