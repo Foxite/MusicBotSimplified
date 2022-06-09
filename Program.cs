@@ -24,7 +24,7 @@ discord.Ready += (_, _) => {
 			DiscordChannel channel = await discord.GetChannelAsync(channelId);
 
 			// no using, this function returns shortly.
-			VoiceNextConnection audio = await channel.ConnectAsync();
+			VoiceNextConnection audio = discord.GetVoiceNext().GetConnection(channel.Guild) ?? await channel.ConnectAsync();
 
 			int users = 0;
 
