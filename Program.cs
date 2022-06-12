@@ -21,6 +21,7 @@ var stopProgram = new CancellationTokenSource();
 discord.Ready += (_, _) => {
 	Task.Run(async () => {
 		try {
+			Console.WriteLine("Begin ready callback.");
 			await Task.Delay(TimeSpan.FromSeconds(1));
 			DiscordChannel channel = await discord.GetChannelAsync(channelId);
 
@@ -42,14 +43,17 @@ discord.Ready += (_, _) => {
 				keepTransmitting = true;
 				_ = Task.Run(async () => {
 					try {
+						Console.WriteLine("Start transmitting.");
 						await using FileStream file = File.OpenRead(track);
 						VoiceTransmitSink transmit = audio.GetTransmitSink();
 						while (keepTransmitting) {
 							file.Seek(position, SeekOrigin.Begin);
-							int count;
+							int count = -2;
+							Console.WriteLine("Begin playback loop.");
 							while (keepTransmitting && (count = file.Read(buffer, 0, buffer.Length)) > 0) {
 								await transmit.WriteAsync(buffer, 0, count);
 							}
+							Console.WriteLine($"End playback loop. keepTransmitting: {keepTransmitting}, count: {count}");
 
 							if (keepTransmitting) {
 								position = 0;
@@ -57,8 +61,9 @@ discord.Ready += (_, _) => {
 								break;
 							}
 						}
-
+						
 						position = file.Position;
+						Console.WriteLine($"Stop transmitting. Position: {position}");
 					} catch (Exception ex) {
 						Console.WriteLine(ex);
 						stopProgram.Cancel();
@@ -67,23 +72,28 @@ discord.Ready += (_, _) => {
 			}
 
 			discord.VoiceStateUpdated += (_, e) => {
+				Console.WriteLine($"Voice state updated. users now: {users}");
 				if ((e.Before == null || e.Before.Channel == null || e.Before.Channel.Id != channelId) && e.After != null && e.After.Channel != null && e.After.Channel.Id == channelId) {
+					Console.WriteLine("User appears to have joined");
 					if (users++ == 0 && users >= 1) {
+						Console.WriteLine("Call startTransmitting");
 						StartTransmitting();
 					}
-					Console.WriteLine(users);
 				} else if (e.Before != null && e.Before.Channel != null && e.Before.Channel.Id == channelId && (e.After == null || e.After.Channel == null || e.After.Channel.Id != channelId)) {
+					Console.WriteLine("User appears to have left");
 					if (users-- >= 1 && users == 0) {
+						Console.WriteLine("Call stopTransmitting");
 						StopTransmitting();
 					}
-					Console.WriteLine(users);
 				}
+				Console.WriteLine($"End of VSU. Users now: {users}");
 				return Task.CompletedTask;
 			};
 
 			users = audio.TargetChannel.Users.Count(member => !member.IsCurrent);
-			Console.WriteLine(users);
+			Console.WriteLine($"End of ready callback. Current users: {users}");
 			if (users >= 1) {
+				Console.WriteLine("Call startTransmitting at end of ready callback");
 				StartTransmitting();
 			}
 		} catch (Exception ex) {
