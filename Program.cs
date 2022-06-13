@@ -18,9 +18,16 @@ var discord = new DiscordClient(new DiscordConfiguration() {
 
 var stopProgram = new CancellationTokenSource();
 
+bool doneReady = false;
+
 discord.Ready += (_, _) => {
+	if (doneReady) {
+		return Task.CompletedTask;
+	}
+	
 	Task.Run(async () => {
 		try {
+			doneReady = true;
 			Console.WriteLine("Begin ready callback.");
 			await Task.Delay(TimeSpan.FromSeconds(1));
 			DiscordChannel channel = await discord.GetChannelAsync(channelId);
