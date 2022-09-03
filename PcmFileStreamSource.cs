@@ -37,6 +37,7 @@ public class PcmFileSessionSource : MusicSessionSource {
 
 		public override void Dispose() {
 			m_Source.m_Position = m_Stream.Position;
+			m_Stream.Dispose();
 		}
 	}
 }
