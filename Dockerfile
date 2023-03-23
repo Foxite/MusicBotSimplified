@@ -19,4 +19,4 @@ RUN apt-get update \
 
 WORKDIR /app
 COPY --from=build /app/publish .
-CMD ["dotnet", "IkIheMusicBotSimplified.dll"]
+CMD ["./IkIheMusicBotSimplified"]
